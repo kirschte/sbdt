@@ -1,4 +1,6 @@
 # S-BDT
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.12783768.svg)](https://doi.org/10.5281/zenodo.12783768)
+
 [S-BDT: Distributed Differentially Private Boosted Decision Trees](https://arxiv.org/abs/2309.12041)
 
 by Thorsten Peinemann\*, Moritz Kirschte\*, Joshua Stock, Carlos Cotrini, Esfandiar Mohammadi.
