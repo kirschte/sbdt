@@ -22,7 +22,7 @@ using namespace std;
 vector<HyperParams> generate_combinations_A(const vector<double> g_star, const vector<double> h_star, const vector<int> nb, const vector<int> d,
 const vector<double> Q_A, const vector<double> r1_A, const vector<bool> isc, const vector<bool> cfi, const vector<bool> rsc,
 const vector<int> lrm, const vector<double> lam, const vector<int> rs_r, const vector<double> lr, const vector<bool> is_A,
-const vector<double> isr, const vector<double> ist) {
+const vector<double> isr, const vector<double> ist, const vector<bool> use_pf, const vector<double> pf_trees_factor, const vector<double> add_trees_factor) {
     vector<HyperParams> combinations;
     for (double g : g_star) {
         for (double h : h_star) {
@@ -39,7 +39,14 @@ const vector<double> isr, const vector<double> ist) {
                                             for (bool is_ : is_A) {
                                               for (double isr_ : isr) {
                                                 for (double ist_ : ist) {
-                                                  combinations.push_back({g, h, n, dim, q, r, is, cf, rs, lrm_, la, l, false, -1, is_, isr_, ist_});
+                                                  for (bool use_pf_ : use_pf) {
+                                                    for (int pf_trees_factor_ : pf_trees_factor) {
+                                                      for (int add_trees_factor_ : add_trees_factor) {
+                                                        if (use_pf_ && add_trees_factor_ > 0.0) continue; // when using Rényi filter, no naive extra rounds
+                                                        combinations.push_back({g, h, n, dim, q, r, is, cf, rs, lrm_, la, l, false, -1, is_, isr_, ist_, use_pf_, (int)(n * pf_trees_factor_), (int)(n * add_trees_factor_)});
+                                                      }
+                                                    }
+                                                  }
                                                 }
                                               }
                                             }
@@ -60,7 +67,7 @@ const vector<double> isr, const vector<double> ist) {
 
 vector<HyperParams> generate_combinations_B(const vector<double> g_star, const vector<double> h_star, const vector<int> nb, const vector<int> d,
 const vector<double> Q_B, const vector<double> r1_B, const vector<bool> isc, const vector<bool> cfi, const vector<bool> rsc,
-const vector<int> lrm, const vector<double> lam, const vector<bool> rs_B, const vector<int> rs_r, const vector<double> lr) {
+const vector<int> lrm, const vector<double> lam, const vector<bool> rs_B, const vector<int> rs_r, const vector<double> lr, const vector<double> add_trees_factor) {
     vector<HyperParams> combinations;
     for (double g : g_star) {
         for (double h : h_star) {
@@ -76,7 +83,9 @@ const vector<int> lrm, const vector<double> lam, const vector<bool> rs_B, const 
                                           for (bool rs_val : rs_B) {
                                               for (int rs_r_val : rs_r) {
                                                 for (double l : lr) {
-                                                  combinations.push_back({g, h, n, dim, q, r, is, cf, rs, lrm_, la, l, rs_val, rs_r_val, false, 0.0, 0.0});
+                                                  for (int add_trees_factor_ : add_trees_factor) {
+                                                    combinations.push_back({g, h, n, dim, q, r, is, cf, rs, lrm_, la, l, rs_val, rs_r_val, false, 0.0, 0.0, false, 0, (int)(n * add_trees_factor_)});
+                                                  }
                                                 }
                                               }
                                           }
@@ -101,6 +110,7 @@ int HpSearch::main(int argc, char *argv[])
   vector<double> eps;
   max_feature_type split_method;
   bool newton_boosting = false;
+  bool learning_on_streams = false;
   pair<double, double> feature_val_border;
   vector<double> g_star;
   vector<double> h_star;
@@ -121,6 +131,9 @@ int HpSearch::main(int argc, char *argv[])
   vector<bool> is_A;
   vector<double> isr;
   vector<double> ist;
+  vector<bool> use_pf;
+  vector<double> pf_trees_factor;
+  vector<double> add_trees_factor;
 
   if (argc >= 3) {
     if (!std::strcmp(argv[2], "--figure3a")){
@@ -129,7 +142,7 @@ int HpSearch::main(int argc, char *argv[])
       eps = {0.05, 0.1, 0.2, 0.3, 0.5};
       newton_boosting = false;
       feature_val_border = {0.0, 0.5};
-      g_star = {0.1, 0.3, 0.5, 0.7};
+      g_star = {0.1, 0.3, 0.5, 0.7, 0.9};
       h_star = {0.0};
       nb = {5, 10, 25, 50, 100, 150, 200, 300, 400, 500, 600};
       d = {2, 3, 5, 6};
@@ -148,13 +161,16 @@ int HpSearch::main(int argc, char *argv[])
       is_A = {true, false};
       isr = {0.1, 0.3};
       ist = {0.1, 0.5, 1.0};
+      use_pf = {false};
+      pf_trees_factor = {0.0};
+      add_trees_factor = {0.0};
     } else if (!std::strcmp(argv[2], "--figure3b")){
       dataset_name = "adult";
       split_method = RAND;
       eps = {0.01, 0.02, 0.03, 0.1, 0.5};
       newton_boosting = true;
       feature_val_border = {0.0, 100.0};
-      g_star = {0.1, 0.3, 0.5, 0.7};
+      g_star = {0.1, 0.3, 0.5, 0.7, 0.9};
       h_star = {0.1, 0.25};
       nb = {5, 10, 25, 50, 100, 150, 200, 300, 400, 500, 600};
       d = {2, 3, 5, 6};
@@ -173,13 +189,16 @@ int HpSearch::main(int argc, char *argv[])
       is_A = {true, false};
       isr = {0.0};
       ist = {0.0};
+      use_pf = {false};
+      pf_trees_factor = {0.0};
+      add_trees_factor = {0.0};
     } else if (!std::strcmp(argv[2], "--figure3c")){
       dataset_name = "spambase";
       split_method = RAND;
       eps = {0.01, 0.02, 0.03, 0.1, 0.5};
       newton_boosting = true;
       feature_val_border = {0.0, 1.0};
-      g_star = {0.1, 0.3, 0.5, 0.7};
+      g_star = {0.1, 0.3, 0.5, 0.7, 0.9};
       h_star = {0.1, 0.25};
       nb = {5, 10, 25, 50, 100, 150, 200, 300, 400, 500, 600};
       d = {2, 3, 5, 6};
@@ -198,6 +217,9 @@ int HpSearch::main(int argc, char *argv[])
       is_A = {true, false};
       isr = {0.0};
       ist = {0.0};
+      use_pf = {false};
+      pf_trees_factor = {0.0};
+      add_trees_factor = {0.0};
     } else if (!std::strcmp(argv[2], "--figure3a-non-private") or !std::strcmp(argv[2], "--figure3a-non-private-random")){
       dataset_name = "abalone";
       split_method = !std::strcmp(argv[2], "--figure3a-non-private-random") ? RAND : ALL;
@@ -223,6 +245,9 @@ int HpSearch::main(int argc, char *argv[])
       is_A = {false};
       isr = {0.0};
       ist = {0.0};
+      use_pf = {false};
+      pf_trees_factor = {0.0};
+      add_trees_factor = {0.0};
     } else if (!std::strcmp(argv[2], "--figure3b-non-private") or !std::strcmp(argv[2], "--figure3b-non-private-random")){
       dataset_name = "adult";
       split_method = !std::strcmp(argv[2], "--figure3b-non-private-random") ? RAND : ALL;
@@ -248,6 +273,67 @@ int HpSearch::main(int argc, char *argv[])
       is_A = {false};
       isr = {0.0};
       ist = {0.0};
+      use_pf = {false};
+      pf_trees_factor = {0.0};
+      add_trees_factor = {0.0};
+    } else if (!std::strcmp(argv[2], "--figure4a")){
+      dataset_name = "abalone";
+      learning_on_streams = true;
+      split_method = RAND;
+      eps = {0.05, 0.1, 0.2, 0.3, 0.5};
+      newton_boosting = false;
+      feature_val_border = {0.0, 0.5};
+      g_star = {0.1, 0.3, 0.5, 0.7};
+      h_star = {0.0};
+      nb = {5, 10, 25, 100, 200, 400};
+      d = {2, 4, 6};
+      Q_A = {0.1}; 
+      Q_B = {1.0};
+      r1_A = {0.2}; 
+      r1_B = {0.5};
+      isc = {true};
+      cfi = {true};
+      rsc = {true};
+      lrm = {1};
+      lam = {1, 15};
+      lr = {0.1, 0.3};
+      rs_B = {true};
+      rs_r = {5};
+      is_A = {true};
+      isr = {0.1};
+      ist = {1.0};
+      use_pf = {true, false};
+      pf_trees_factor = {0.0, 0.25, 0.5, 0.75, 1.0};
+      add_trees_factor = {0.0, 0.25, 0.5, 0.75, 1.0};
+    } else if (!std::strcmp(argv[2], "--figure4b")){
+      dataset_name = "adult";
+      learning_on_streams = true;
+      split_method = RAND;
+      eps = {0.01, 0.02, 0.03, 0.1, 0.5};
+      newton_boosting = true;
+      feature_val_border = {0.0, 100.0};
+      g_star = {0.1, 0.3, 0.5, 0.7};
+      h_star = {0.1, 0.25};
+      nb = {25, 50, 200, 400};
+      d = {2, 4, 6};
+      Q_A = {0.1}; 
+      Q_B = {1.0};
+      r1_A = {0.1}; 
+      r1_B = {0.5};
+      isc = {true};
+      cfi = {true};
+      rsc = {true};
+      lrm = {1};
+      lam = {1, 10};
+      lr = {0.1, 0.3};
+      rs_B = {true};
+      rs_r = {5};
+      is_A = {true};
+      isr = {0.1};
+      ist = {1.0};
+      use_pf = {true, false};
+      pf_trees_factor = {0.0, 0.25, 0.5, 0.75, 1.0};
+      add_trees_factor = {0.0, 0.25, 0.5, 0.75, 1.0};
     } else {
       throw std::runtime_error("Unknown figure.");
     }
@@ -268,11 +354,6 @@ int HpSearch::main(int argc, char *argv[])
   // setup of method
   // sgbdt, maddock, xgboost or dpboost
   std::string method = "xgboost";
-
-  // setup of learning
-  // regular or stream
-  bool learning_on_streams = false;
-  
 
   if(argc > 2){
     for (int i=1; i<argc; i++) {
@@ -301,8 +382,8 @@ int HpSearch::main(int argc, char *argv[])
   std::cout << "evaluation, writing results to " << outfile_name << std::endl;
   output << "method,dataset,runs,nb_samples,learning_streams,learning_rate,nb_trees,max_depth,use_dp,real_eps,alpha,rho,sigma,privacy_budget,train_auc_mean,train_auc_std,train_accuracy_mean,train_accuracy_std,train_untuned_accuracy_mean,train_untuned_accuracy_std,train_rmse_mean,train_rmse_std,test_auc_mean,test_auc_std,test_accuracy_mean,test_accuracy_std,test_untuned_accuracy_mean,test_untuned_accuracy_std,test_rmse_mean,test_rmse_std,r1,glc,gdf,bal_p,l2_thr,hess_l2_thr,Q,use_pf,pf_add,add_trees,pf_l2_thr,pf_hess_l2_thr,pf_Q_factor,lambda,feature_val_u_border,init_ratio,init_thr,newton,cyclical_fi,refine_splits,rs_rounds,rs_subsample,ignore_split_constraints,random_splits_from_candidates,lambda_reg_mode,cut_off_leaf_denom,reg_delta,min_samples_split,split_pb_ratio" << std::endl;
 
-  std::vector<HyperParams> combinations_A = generate_combinations_A(g_star, h_star, nb, d, Q_A, r1_A, isc, cfi, rsc, lrm, lam, rs_r, lr, is_A, isr, ist);
-  std::vector<HyperParams> combinations_B = generate_combinations_B(g_star, h_star, nb, d, Q_B, r1_B, isc, cfi, rsc, lrm, lam, rs_B, rs_r, lr);
+  std::vector<HyperParams> combinations_A = generate_combinations_A(g_star, h_star, nb, d, Q_A, r1_A, isc, cfi, rsc, lrm, lam, rs_r, lr, is_A, isr, ist, use_pf, pf_trees_factor, add_trees_factor);
+  std::vector<HyperParams> combinations_B = generate_combinations_B(g_star, h_star, nb, d, Q_B, r1_B, isc, cfi, rsc, lrm, lam, rs_B, rs_r, lr, add_trees_factor);
 
   std::vector<int> experiment_order_A(combinations_A.size());
   std::vector<int> experiment_order_B(combinations_B.size());
@@ -316,6 +397,7 @@ int HpSearch::main(int argc, char *argv[])
   int experiment_cnt = 0;
   size_t N_REPEATS = 4;
   size_t N_SPLITS = 5;
+  if (learning_on_streams) N_REPEATS = 40;
 
   while(experiment_cnt < max(combinations_A.size(), combinations_B.size())) {
     for (auto e : eps) {

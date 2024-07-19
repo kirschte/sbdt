@@ -164,9 +164,12 @@ struct HyperParams {
     bool is;
     double isr;
     double ist;
+    bool use_pf;
+    int pf_trees;
+    int add_trees;
     
     bool operator==(const HyperParams& other) const {
-        return std::tie(g, h, nb, d, Q, r1, isc, cfi, rsc, lrm, lam, lr, rs, rs_r, is, isr, ist) == std::tie(other.g, other.h, other.nb, other.d, other.Q, other.r1, other.isc, other.cfi, other.rsc, other.lrm, other.lam, other.lr, other.rs, other.rs_r, other.is, other.isr, other.ist);
+        return std::tie(g, h, nb, d, Q, r1, isc, cfi, rsc, lrm, lam, lr, rs, rs_r, is, isr, ist, use_pf, pf_trees, add_trees) == std::tie(other.g, other.h, other.nb, other.d, other.Q, other.r1, other.isc, other.cfi, other.rsc, other.lrm, other.lam, other.lr, other.rs, other.rs_r, other.is, other.isr, other.ist, other.use_pf, other.pf_trees, other.add_trees);
     }
 };
 

@@ -18,7 +18,8 @@ typedef std::chrono::steady_clock::time_point Timer;
 
 using namespace std;
 
-std::vector<HyperParams> processCSV(const std::string &filename, const bool regression, const double eps, const double Q, const double r1, const double isr) {
+std::vector<HyperParams> read_hyperparameters(const std::string &filename, const bool regression, const double eps, const double Q, const double r1, const double isr,
+const bool use_pf) {
     std::ifstream file(filename);
     std::string line;
     std::vector<std::string> headers;
@@ -45,6 +46,7 @@ std::vector<HyperParams> processCSV(const std::string &filename, const bool regr
     int idx_Q = columnIndex["Q"];
     int idx_r1 = columnIndex["r1"];
     int idx_isr = columnIndex["init_ratio"];
+    int idx_use_pf = columnIndex["use_pf"];
 
     std::vector<std::vector<std::string>> data;
 
@@ -62,13 +64,15 @@ std::vector<HyperParams> processCSV(const std::string &filename, const bool regr
     double max_score = regression ? std::numeric_limits<double>::infinity() : -std::numeric_limits<double>::infinity();
     std::vector<std::string> best_row;
     for (const auto& row : data) {
-        if (std::stod(row[idx_privacy_budget]) == eps && std::stod(row[idx_Q]) == Q && std::stod(row[idx_r1]) == r1 && std::stod(row[idx_isr]) == isr) {
-            double score = std::stod(row[idx_score_mean]);
-            if ((regression and (score < max_score)) or (!regression and (score > max_score))) {
-                max_score = score;
-                best_row = row;
-            }
-        }
+      if (std::stod(row[idx_privacy_budget]) == eps && std::stod(row[idx_Q]) == Q && std::stod(row[idx_r1]) == r1 && std::stod(row[idx_isr]) == isr
+      && ((use_pf && (row[idx_use_pf] == "True" ||row[idx_use_pf] == "true" ||row[idx_use_pf] == "1")) ||
+      (!use_pf && (row[idx_use_pf] == "False" ||row[idx_use_pf] == "false" ||row[idx_use_pf] == "0")))) {
+          double score = std::stod(row[idx_score_mean]);
+          if ((regression and (score < max_score)) or (!regression and (score > max_score))) {
+              max_score = score;
+              best_row = row;
+          }
+      }
     }
     if (!best_row.empty()) {
         HyperParams result;
@@ -99,6 +103,9 @@ std::vector<HyperParams> processCSV(const std::string &filename, const bool regr
         result.isr = std::stod(best_row[columnIndex["init_ratio"]]);
         result.is = result.isr > 0.0 ? true : false;
         result.ist = result.isr > 0.0 ? std::stod(best_row[columnIndex["init_thr"]]) : 0.0;
+        result.use_pf = best_row[columnIndex["use_pf"]] == "True" or best_row[columnIndex["use_pf"]] == "true" or best_row[columnIndex["use_pf"]] == "1";
+        result.pf_trees = result.use_pf ? std::stoi(best_row[columnIndex["pf_add"]]) : 0;
+        result.add_trees = result.use_pf ? 0 : std::stoi(best_row[columnIndex["add_trees"]]);
         results.push_back(result);
     }
     return results;
@@ -120,6 +127,7 @@ int Rerun::main(int argc, char *argv[])
   vector<double> Qs;
   vector<double> r1s;
   vector<double> isrs;
+  vector<bool> use_pfs;
 
   bool learning_on_streams = false;
 
@@ -133,6 +141,7 @@ int Rerun::main(int argc, char *argv[])
       Qs = {0.1, 1.0};
       r1s = {0.04, 0.3, 0.5};
       isrs = {0.0, 0.1, 0.3};
+      use_pfs = {false};
     } else if (!std::strcmp(argv[2], "--figure3b")){
       dataset_name = "adult";
       regression = false;
@@ -142,6 +151,7 @@ int Rerun::main(int argc, char *argv[])
       Qs = {0.01, 1.0};
       r1s = {0.04, 0.1, 0.5};
       isrs = {0.0, 0.1, 0.3};
+      use_pfs = {false};
     } else if (!std::strcmp(argv[2], "--figure3c")){
       dataset_name = "spambase";
       regression = false;
@@ -151,6 +161,7 @@ int Rerun::main(int argc, char *argv[])
       Qs = {0.1, 1.0};
       r1s = {0.1, 0.2, 0.5};
       isrs = {0.0};
+      use_pfs = {false};
     } else if (!std::strcmp(argv[2], "--figure3a-non-private") or !std::strcmp(argv[2], "--figure3a-non-private-random")){
       dataset_name = "abalone";
       regression = true;
@@ -161,6 +172,7 @@ int Rerun::main(int argc, char *argv[])
       Qs = {0.1, 1.0};
       r1s = {-1};
       isrs = {0.0};
+      use_pfs = {false};
     } else if (!std::strcmp(argv[2], "--figure3b-non-private") or !std::strcmp(argv[2], "--figure3b-non-private-random")){
       dataset_name = "adult";
       regression = false;
@@ -171,6 +183,29 @@ int Rerun::main(int argc, char *argv[])
       Qs = {0.005, 1.0};
       r1s = {-1};
       isrs = {0.0};
+      use_pfs = {false};
+    } else if (!std::strcmp(argv[2], "--figure4a")){
+      dataset_name = "abalone";
+      regression = true;
+      learning_on_streams = true;
+      newton_boosting = false;
+      eps = {0.05, 0.1, 0.2, 0.3, 0.5};
+      Qs = {0.1, 1.0};
+      r1s = {0.2, 0.5};
+      isrs = {0.0, 0.1};
+      feature_val_border = {0.0, 0.5};
+      use_pfs = {true, false};
+    } else if (!std::strcmp(argv[2], "--figure4b")){
+      dataset_name = "adult";
+      regression = false;
+      learning_on_streams = true;
+      newton_boosting = true;
+      eps = {0.01, 0.02, 0.03, 0.1, 0.5};
+      Qs = {0.1, 1.0};
+      r1s = {0.1, 0.5};
+      isrs = {0.0};
+      feature_val_border = {0.0, 100.0};
+      use_pfs = {true, false};
     } else {
       throw std::runtime_error("Unknown figure.");
     }
@@ -215,7 +250,7 @@ int Rerun::main(int argc, char *argv[])
 
   for (auto e : eps) {
     
-    if (e > 0.0 and e <= 0.1) N_REPEATS = 200;
+    if (e > 0.0 and e <= 0.1 and !learning_on_streams) N_REPEATS = 200;
     else N_REPEATS = 40;
 
     int experiment_cnt = 0;
@@ -224,8 +259,11 @@ int Rerun::main(int argc, char *argv[])
     for (auto Q : Qs) {
       for (auto r1 : r1s) {
         for (auto isr : isrs) {
-          combinations = processCSV(input_file, regression, e, Q, r1, isr);
-          combinations_A.insert(combinations_A.end(), combinations.begin(), combinations.end());
+          for (auto use_pf : use_pfs) {
+            if (use_pf && Q == 1.0 && r1 == 0.5 && isr == 0.0) continue; // Maddock et al. is not evaluated with Rényi filter
+            combinations = read_hyperparameters(input_file, regression, e, Q, r1, isr, use_pf);
+            combinations_A.insert(combinations_A.end(), combinations.begin(), combinations.end());
+          }
         }
       }
     }
@@ -270,13 +308,13 @@ int Rerun::main(int argc, char *argv[])
       param.privacy_budget_gain_ratio = 0.0;
       param.leaf_denom_noise_weight = hp.r1;
       param.reg_delta = 2.0;
-      param.additional_nb_trees = 0;
+      param.additional_nb_trees = hp.add_trees;
 
       param.continuous_learning = learning_on_streams;
 
-      param.use_privacy_filter = false;
+      param.use_privacy_filter = hp.use_pf;
       param.approximate_privacy_filter = true;
-      param.pf_additional_nb_trees = 0;
+      param.pf_additional_nb_trees = hp.pf_trees;
       param.pf_l2_threshold = param.l2_threshold;
       param.pf_hess_l2_threshold = param.hess_l2_threshold;
       param.pf_subsampling_ratio_factor = 1.0;
@@ -336,7 +374,6 @@ int Rerun::main(int argc, char *argv[])
           } else {
             ensembles[thread_id].train(&(cv_inputs[thread_id]->train));
           }
-          //break;
         }
       }
 
