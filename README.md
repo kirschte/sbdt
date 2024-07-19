@@ -1,5 +1,5 @@
 # S-BDT
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.12783768.svg)](https://doi.org/10.5281/zenodo.12783768)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.12783789.svg)](https://doi.org/10.5281/zenodo.12783789)
 
 [S-BDT: Distributed Differentially Private Boosted Decision Trees](https://arxiv.org/abs/2309.12041)
 
