@@ -92,7 +92,7 @@ cdef extern from "parameters.h":
 
 cdef extern from "loss.h":
     ctypedef enum classify_metric:
-        NO_CLASSIFY,
+        RMSE,
         ACC,
         UNTUNED_ACC,
         AUC_WMW,

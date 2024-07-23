@@ -4,7 +4,7 @@
 
 cimport cython
 cimport numpy as np
-from csbdt cimport (NO_CLASSIFY, VVD, VVI, BinaryClassification, DataSet,
+from csbdt cimport (RMSE, VVD, VVI, BinaryClassification, DataSet,
                     DPEnsemble, ModelParams, Regression, Task, classify_metric,
                     criterion_type, inverse_scale_y, lambda_reg_type,
                     max_feature_type, noise_type, pf_accountant_type,
@@ -228,12 +228,12 @@ cdef class S_BDT:
     
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def score(self, np.ndarray[double, ndim=1, mode="c"] y not None, np.ndarray[double, ndim=1, mode="c"] y_pred not None, classify_metric metric=NO_CLASSIFY):
+    def score(self, np.ndarray[double, ndim=1, mode="c"] y not None, np.ndarray[double, ndim=1, mode="c"] y_pred not None, classify_metric metric=RMSE):
         cdef vector[double] y_vec = y
         cdef vector[double] y_pred_vec = y_pred
 
         capture = py.io.StdCaptureFD(out=False, in_=False)
-        score = self.model_params.task.get().compute_score(y_vec, y_pred_vec, metric if metric else NO_CLASSIFY)
+        score = self.model_params.task.get().compute_score(y_vec, y_pred_vec, metric if metric else RMSE)
 
         out, err = capture.reset()
         return score
