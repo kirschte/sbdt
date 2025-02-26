@@ -4,7 +4,7 @@
 [S-BDT: Distributed Differentially Private Boosted Decision Trees](https://arxiv.org/abs/2309.12041)
 
 by Thorsten Peinemann\*, Moritz Kirschte\*, Joshua Stock, Carlos Cotrini, Esfandiar Mohammadi.
-arXiv, Sep. 2023.
+In Proceedings of the 2024 on ACM SIGSAC Conference on Computer and Communications Security (CCS '24). 2024.
 
 \* The first two authors equally contributed to this work.
 
