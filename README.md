@@ -11,29 +11,103 @@ In Proceedings of the 2024 ACM SIGSAC Conference on Computer and Communications 
 This repository is based on the [work](https://github.com/loretanr/dp-gbdt) by Rudolf Loretan.
 
 
+Table of Contents:
+- [S-BDT](#s-bdt)
+  - [Requirements](#requirements)
+  - [Installing](#installing)
+    - [C++ Library](#c-library)
+    - [CPython Module](#cpython-module)
+  - [Reproducing our results](#reproducing-our-results)
+    - [Python Variant](#python-variant)
+      - [C++ Variant](#c-variant)
+  - [Including S-BDT into your own projects](#including-s-bdt-into-your-own-projects)
+    - [Other CMake Projects](#other-cmake-projects)
+    - [Python / Jupyter Notebook](#python--jupyter-notebook)
+  - [Documentation Reference](#documentation-reference)
+    - [Parameter Specification](#parameter-specification)
+    - [Privacy Accounting](#privacy-accounting)
+  - [Datasets](#datasets)
+    - [Custom Dataset](#custom-dataset)
+    - [Data splits for a stream of non-IID data](#data-splits-for-a-stream-of-non-iid-data)
+  - [Limitations](#limitations)
+
+
+
 ## Requirements
 
-tested on a Ubuntu 20.04.6 VM with Python 3.8 and g++ 9.4.
+tested on a Ubuntu 22.04 with Python 3.10.12 and g++ 11.4.0.
 We wrote the code in C++11 and provided a Cython-based Python wrapper.
 
 C++ code only:
 ```bash
-sudo apt install libspdlog-dev icdiff libfmt-dev
+sudo apt install libspdlog-dev icdiff libfmt-dev ninja-build -y
 ```
 
 Additionally, for the Cython wrapper:
-```
+```bash
 sudo apt install python3-pip
 sudo pip3 install icc_rt  # install libsvml globally
 sudo ldconfig  # add libsvml to shared libraries
-python3 -m pip install -r code/requirements.txt
 ```
 
-## Running Instructions
+## Installing
+
+### C++ Library
+
+After installing all dependencies, you can build using CMake:
+
+```bash
+mkdir build && cd build
+
+cmake -GNinja ..
+
+cmake --build .
+sudo cmake --install .
+```
+
+By default this will install `libsbdt.so` to `/usr/local/lib` and all headers to `/usr/local/include`. You can change the install path by setting `CMAKE_INSTALL_PREFIX`.
+
+```bash
+# example /usr will install to /usr/lib and /usr/include
+sudo cmake --install -DCMAKE_INSTALL_PREFIX=<path> .
+```
+
+### CPython Module
+
+**NOTE: you have to build and install the C++ library before building the python module! See [C++ Library section](#c-library) for more info.**
+
+Optional: Create a python [virtual environment for better isolation](https://docs.python.org/3/library/venv.html) before installing:
+
+```bash
+cd <project root directory>
+
+python -m venv .venv
+source .venv/bin/activate
+```
+
+Build and install the S-BDT python module:
+
+```bash
+cd code 
+
+python -m pip install -r requirements.txt # install requirements
+python -m pip install . # install S-BDT
+```
+
+If you installed the C++ Library to a custom path (i.e. not to `/usr/local`), you have can simply set `CMAKE_INSTALL_PREFIX` before calling pip. Example:
+
+```sh
+export CMAKE_INSTALL_PREFIX="/usr/"
+python -m pip install .
+```
+
+## Reproducing our results
 
 ### Python Variant
+
 We refer to [example_pycall.py](/code/example_pycall.py) for the configuration of a single run.
 We note that we provide a sklearn-like interface that works with NumPy arrays:
+
 ```python
 import sbdt
 model = sbdt.S_BDT(/*params*/)
@@ -42,32 +116,97 @@ y_pred = model.predict(X_test)
 score = model.score(y_test, y_pred, /*scoring function enum*/)
 ```
 
-Build:
+**Build:**
+
+Follow the steps outlaid in the [CPython Module section](#cpython-module)pycall.py
+
+**Run:**
+
 ```bash
-cd code/cpp_gbdt/
-make fast_shared
-cd ..
-python3 setup.py build_ext -i
-```
-Run:
-```
-python3 example_pycall.py
+cd code
+
+python example_pycall.py
 ```
 
-### C++ Variant
+The script will load the [Abalone dataset](https://archive.ics.uci.edu/dataset/1/abalone), train with predefined parameters (`ε = 0.1`) and render the first 20 trees into `code/img`.
+
+#### C++ Variant
+
 We refer to [main.cpp](code/cpp_gbdt/src/main.cpp) for the configuration of a single non-multithreaded cross-validated run and [evaluation.cpp](code/cpp_gbdt/src/evaluation.cpp) for a multi-threaded hyperparameter search template that creates a .csv in the [results](code/cpp_gbdt/results) directory.
 
-Build:
+**Build:**
+
+By default, the c++ example application **won't be build**. You have to set `BUILD_EXAMPLE_APPLICATION` to `ON`. This will also download the required datasets.
+
 ```bash
-cd code/cpp_gbdt/
-make fast
-```
-Run:
-```
-./run
-(./run --eval)
+mkdir build # only if you did not already build
+
+cd build
+
+cmake -GNinja -DBUILD_EXAMPLE_APPLICATION=ON ..
+
+cmake --build .
 ```
 
+**Run:**
+
+```bash
+# IMPORTANT: Make sure you are in the same directory as the downloaded datasets (i.e. build)
+# .
+# ├── code
+# │   └── cpp_gbdt
+# │       └── run_example
+# └── datasets
+#     └── real
+#         ├── abalone.data
+#         ├── adult.data
+#         └── spambase.data
+
+./code/cpp_gbdt/run_example
+```
+
+## Including S-BDT into your own projects
+
+### Other CMake Projects
+
+After [installing](#c-library), S-BDT registers itself as a CMake project. This means, that you are simply able to include it as you would any other package. See [main.cpp](code/cpp_gbdt/src/main.cpp) for an example `main` file.
+
+```cmake
+cmake_minimum_required(VERSION 3.5.0)
+project(sbdt-example VERSION 0.1.0 LANGUAGES C CXX)
+
+# create target
+set(TARGET sbdt-train)
+add_executable(${TARGET} main.cpp)
+
+# import S-BDT package
+find_package(sbdt REQUIRED)
+
+# link it to your target
+target_link_libraries(${TARGET} PUBLIC sbdt::sbdt)
+```
+
+### Python / Jupyter Notebook
+
+After installing S-BDT with pip, your can use it as any other python module. See [example_pycall.py](/code/example_pycall.py) for an example on how you could use S-BDT.
+
+```py
+import sbdt
+...
+```
+
+When using Jupyter Notebooks: Depending on your setup, you might need to build S-BDT directly inside Jupyter. You can include the following magic command at the top of your notebook.
+
+```bash
+%pip install "<repository root>/code/"
+
+# OR
+
+!python -m pip install "<repository root>/code"
+```
+
+
+## Documentation Reference
 
 ### Parameter Specification
 
